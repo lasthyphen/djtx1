@@ -1,0 +1,61 @@
+@font-face {
+    font-family: "Uber Move Text";
+    src: url("https://voting.dijets.io/fontu/ubermovetextregular-webfont.eot");
+    src: url("https://voting.dijets.io/fontu/ubermovetextregular-webfont.woff") format("woff"),
+    url("https://voting.dijets.io/fontu/ubermovetextregular-webfont.otf") format("opentype"),
+    url("https://voting.dijets.io/fontu/ubermovetextregular-webfont.svg#filename") format("svg");
+    }
+  
+  @font-face {
+    font-family: "Uber Move Text Medium";
+    src: url("https://voting.dijets.io/fontu/ubermovetextmedium-webfont.eot");
+    src: url("https://voting.dijets.io/fontu/ubermovetextmedium-webfont.woff") format("woff"),
+    url("https://voting.dijets.io/fontu/ubermovetextmedium-webfont.otf") format("opentype"),
+    url("https://voting.dijets.io/fontu/ubermovetextmedium-webfont.svg#filename") format("svg");
+    }
+  
+  @font-face {
+    font-family: "Uber Move Text Bold";
+    src: url("https://voting.dijets.io/fontu/ubermovetextbold-webfont.eot");
+    src: url("https://voting.dijets.io/fontu/ubermovetextbold-webfont.woff") format("woff"),
+    url("https://voting.dijets.io/fontu/ubermovetextbold-webfont.otf") format("opentype"),
+    url("https://voting.dijets.io/fontu/ubermovetextbold-webfont.svg#filename") format("svg");
+    }
+  
+  @font-face {
+    font-family: "Uber Move Text Light";
+    src: url("https://voting.dijets.io/fontu/ubermovetextlight-webfont.eot");
+    src: url("https://voting.dijets.io/fontu/ubermovetextlight-webfont.woff") format("woff"),
+    url("https://voting.dijets.io/fontu/ubermovetextlight-webfont.otf") format("opentype"),
+    url("https://voting.dijets.io/fontu/ubermovetextlight-webfont.svg#filename") format("svg");
+    }
+
+body::-webkit-scrollbar {
+    width: 2px;
+}
+
+body::-webkit-scrollbar-track {
+    box-shadow: inset 0 0 6px rgb(0, 0, 0);
+}
+
+body::-webkit-scrollbar-thumb {
+    background: rgb(113, 113, 113);
+}
+
+.app {
+    font-family: 'Uber Move Text',Helvetica,Arial,sans-serif;
+    padding-top: 5%;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+}
+
+@media screen and (max-width: 1010px) {
+    body {
+        background: rgb(26 28 31) !important;
+    }
+    .app {
+        padding-top: 10%;
+        padding-bottom: 10%;
+    }
+}

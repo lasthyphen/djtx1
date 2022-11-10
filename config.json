@@ -1,0 +1,76 @@
+{
+    "GLOBAL_RL": {
+        "ID": "GLOBAL",
+        "RATELIMIT": {
+            "REVERSE_PROXIES": 2,
+            "MAX_LIMIT": 40,
+            "WINDOW_SIZE": 1,
+            "PATH": "/",
+            "SKIP_FAILED_REQUESTS": false
+        }
+    },
+    "evmchains": [
+        {
+            "ID": "DIJETS",
+            "NAME": "Dijets",
+            "TOKEN": "DJTX",
+            "RPC": "https://dijets.uksouth.cloudapp.azure.com:443/ext/bc/C/rpc",
+            "CHAINID": 43112,
+            "EXPLORER": "http://dijetsapi.centralus.cloudapp.azure.com:4000",
+            "IMAGE": "/chain-djtx.png",
+            "MAX_PRIORITY_FEE": "2000000000",
+            "MAX_FEE": "100000000000",
+            "DRIP_AMOUNT": 0,
+            "RATELIMIT": {
+                "MAX_LIMIT": 1,
+                "WINDOW_SIZE": 1440
+            }
+        }
+    ],
+    "erc20tokens": [
+        {
+            "ID": "DGC",
+            "HOSTID": "DIJETS",
+            "NAME": "Dijets Governance Tester",
+            "TOKEN": "DGC",
+            "IMAGE": "/dgc.svg",
+            "CONTRACTADDRESS": "0x73a08DC74eF4ed2c360199244bb69F1464204E7C",
+            "DRIP_AMOUNT": 0,
+            "GASLIMIT": "100000",
+            "DECIMALS": 18,
+            "RATELIMIT": {
+                "MAX_LIMIT": 1,
+                "WINDOW_SIZE": 1440
+            }
+        },
+        {
+            "ID": "DUSD",
+            "HOSTID": "DIJETS",
+            "NAME": "TestTether",
+            "TOKEN": "DUSD",
+            "IMAGE": "/dusd.svg",
+            "CONTRACTADDRESS": "0xC31205B3017Ed81e2b664Fec7e954c25654d2f06",
+            "DRIP_AMOUNT": 1,
+            "GASLIMIT": "100000",
+            "DECIMALS": 18,
+            "RATELIMIT": {
+                "MAX_LIMIT": 1,
+                "WINDOW_SIZE": 1440
+            }
+        },
+        {
+            "ID": "WDJTX",
+            "HOSTID": "DIJETS",
+            "NAME": "Wrapped Dijets",
+            "TOKEN": "WDJTX",
+            "CONTRACTADDRESS": "0x65C45168E162Ba0acA225ae1D7fb9f931C1A64A1",
+            "DRIP_AMOUNT": 0,
+            "GASLIMIT": "150000",
+            "DECIMALS": 18,
+            "RATELIMIT": {
+                "MAX_LIMIT": 1,
+                "WINDOW_SIZE": 1440
+            }
+        }
+    ]
+}
