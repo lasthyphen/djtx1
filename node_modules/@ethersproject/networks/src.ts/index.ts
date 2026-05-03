@@ -49,7 +49,7 @@ function ethDefaultProvider(network: string | Network): Renetworkable {
             // network does not handle the Berlin hardfork, which is
             // live on these ones.
             // @TODO: This goes away once Pocket has upgraded their nodes
-            const skip = [ "goerli", "ropsten", "rinkeby" ];
+            const skip = [ "goerli", "ropsten", "rinkeby", "sepolia" ];
             try {
                 const provider = new providers.PocketProvider(network, options.pocket);
                 if (provider.network && skip.indexOf(provider.network.name) === -1) {
@@ -66,7 +66,11 @@ function ethDefaultProvider(network: string | Network): Renetworkable {
 
         if (providers.AnkrProvider && options.ankr !== "-") {
             try {
-                providerList.push(new providers.AnkrProvider(network, options.ankr));
+                const skip = [ "ropsten" ];
+                const provider = new providers.AnkrProvider(network, options.ankr);
+                if (provider.network && skip.indexOf(provider.network.name) === -1) {
+                    providerList.push(provider);
+                }
             } catch(error) { }
         }
 
@@ -162,6 +166,12 @@ const networks: { [name: string]: Network } = {
 
     kintsugi: { chainId: 1337702, name: "kintsugi" },
 
+    sepolia: {
+        chainId: 11155111,
+        name: "sepolia",
+        _defaultProvider: ethDefaultProvider("sepolia")
+    },
+
 
     // ETC (See: #351)
     classic: {
@@ -183,15 +193,24 @@ const networks: { [name: string]: Network } = {
 
     xdai: { chainId: 100, name: "xdai" },
 
-    matic: { chainId: 137, name: "matic" },
+    matic: {
+        chainId: 137,
+        name: "matic",
+        _defaultProvider: ethDefaultProvider("matic")
+    },
     maticmum: { chainId: 80001, name: "maticmum" },
 
-    optimism: { chainId: 10, name: "optimism" },
+    optimism: {
+        chainId: 10,
+        name: "optimism",
+        _defaultProvider: ethDefaultProvider("optimism")
+    },
     "optimism-kovan": { chainId: 69, name: "optimism-kovan" },
     "optimism-goerli": { chainId: 420, name: "optimism-goerli" },
 
     arbitrum: { chainId: 42161, name: "arbitrum" },
     "arbitrum-rinkeby": { chainId: 421611, name: "arbitrum-rinkeby" },
+    "arbitrum-goerli": { chainId: 421613, name: "arbitrum-goerli" },
 
     bnb: { chainId: 56, name: "bnb" },
     bnbt: { chainId: 97, name: "bnbt" },

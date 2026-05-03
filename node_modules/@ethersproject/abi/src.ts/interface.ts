@@ -90,8 +90,6 @@ export class Interface {
     readonly _isInterface: boolean;
 
     constructor(fragments: string | ReadonlyArray<Fragment | JsonFragment | string>) {
-        logger.checkNew(new.target, Interface);
-
         let abi: ReadonlyArray<Fragment | JsonFragment | string> = [ ];
         if (typeof(fragments) === "string") {
             abi = JSON.parse(fragments);
@@ -442,7 +440,7 @@ export class Interface {
     }
 
     // Create the filter for the event with search criteria (e.g. for eth_filterLog)
-    encodeFilterTopics(eventFragment: EventFragment, values: ReadonlyArray<any>): Array<string | Array<string>> {
+    encodeFilterTopics(eventFragment: EventFragment | string, values: ReadonlyArray<any>): Array<string | Array<string>> {
         if (typeof(eventFragment) === "string") {
             eventFragment = this.getEvent(eventFragment);
         }
@@ -464,6 +462,14 @@ export class Interface {
                  return keccak256(hexlify(value));
             }
 
+            if (param.type === "bool" && typeof(value) === "boolean") {
+                value = (value ? "0x01": "0x00");
+            }
+
+            if (param.type.match(/^u?int/)) {
+                value = BigNumber.from(value).toHexString();
+            }
+
             // Check addresses are valid
             if (param.type === "address") { this._abiCoder.encode( [ "address" ], [ value ]); }
             return hexZeroPad(hexlify(value), 32);
@@ -471,7 +477,7 @@ export class Interface {
 
         values.forEach((value, index) => {
 
-            let param = eventFragment.inputs[index];
+            let param = (<EventFragment>eventFragment).inputs[index];
 
             if (!param.indexed) {
                 if (value != null) {
@@ -499,7 +505,7 @@ export class Interface {
         return topics;
     }
 
-    encodeEventLog(eventFragment: EventFragment, values: ReadonlyArray<any>): { data: string, topics: Array<string> } {
+    encodeEventLog(eventFragment: EventFragment | string, values: ReadonlyArray<any>): { data: string, topics: Array<string> } {
         if (typeof(eventFragment) === "string") {
             eventFragment = this.getEvent(eventFragment);
         }

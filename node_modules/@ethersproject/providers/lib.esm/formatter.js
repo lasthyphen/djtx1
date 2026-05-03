@@ -10,7 +10,6 @@ import { version } from "./_version";
 const logger = new Logger(version);
 export class Formatter {
     constructor() {
-        logger.checkNew(new.target, Formatter);
         this.formats = this.getDefaultFormats();
     }
     getDefaultFormats() {
@@ -205,8 +204,13 @@ export class Formatter {
         if (blockTag === "earliest") {
             return "0x0";
         }
-        if (blockTag === "latest" || blockTag === "pending") {
-            return blockTag;
+        switch (blockTag) {
+            case "earliest": return "0x0";
+            case "latest":
+            case "pending":
+            case "safe":
+            case "finalized":
+                return blockTag;
         }
         if (typeof (blockTag) === "number" || isHexString(blockTag)) {
             return hexValue(blockTag);

@@ -111,7 +111,7 @@ export class PlatformVMAPI extends JRPCAPI {
         this.blockchainID in Defaults.network[`${netid}`]
       ) {
         this.blockchainAlias =
-          Defaults.network[`${netid}`][this.blockchainID].alias
+          Defaults.network[`${netid}`][this.blockchainID]["alias"]
         return this.blockchainAlias
       } else {
         /* istanbul ignore next */
@@ -915,9 +915,9 @@ export class PlatformVMAPI extends JRPCAPI {
     } else if (tx instanceof Buffer) {
       const txobj: Tx = new Tx()
       txobj.fromBuffer(tx)
-      Transaction = txobj.toString()
+      Transaction = txobj.toStringHex()
     } else if (tx instanceof Tx) {
-      Transaction = tx.toString()
+      Transaction = tx.toStringHex()
     } else {
       /* istanbul ignore next */
       throw new TransactionError(
@@ -925,7 +925,8 @@ export class PlatformVMAPI extends JRPCAPI {
       )
     }
     const params: any = {
-      tx: Transaction.toString()
+      tx: Transaction.toString(),
+      encoding: "hex"
     }
     const response: RequestResponseData = await this.callMethod(
       "platform.issueTx",
@@ -1058,7 +1059,7 @@ export class PlatformVMAPI extends JRPCAPI {
    */
   getStake = async (
     addresses: string[],
-    encoding: string = "cb58"
+    encoding: string = "hex"
   ): Promise<GetStakeResponse> => {
     const params: GetStakeParams = {
       addresses,
@@ -1174,7 +1175,7 @@ export class PlatformVMAPI extends JRPCAPI {
    */
   getTx = async (
     txID: string,
-    encoding: string = "cb58"
+    encoding: string = "hex"
   ): Promise<string | object> => {
     const params: any = {
       txID,
@@ -1234,7 +1235,7 @@ export class PlatformVMAPI extends JRPCAPI {
     limit: number = 0,
     startIndex: { address: string; utxo: string } = undefined,
     persistOpts: PersistanceOptions = undefined,
-    encoding: string = "cb58"
+    encoding: string = "hex"
   ): Promise<GetUTXOsResponse> => {
     if (typeof addresses === "string") {
       addresses = [addresses]
@@ -1273,7 +1274,17 @@ export class PlatformVMAPI extends JRPCAPI {
       }
       this.db.set(persistOpts.getName(), data, persistOpts.getOverwrite())
     }
-    utxos.addArray(data, false)
+
+    if (data.length > 0 && data[0].substring(0, 2) === "0x") {
+      const cb58Strs: string[] = []
+      data.forEach((str: string): void => {
+        cb58Strs.push(bintools.cb58Encode(new Buffer(str.slice(2), "hex")))
+      })
+
+      utxos.addArray(cb58Strs, false)
+    } else {
+      utxos.addArray(data, false)
+    }
     response.data.result.utxos = utxos
     response.data.result.numFetched = parseInt(response.data.result.numFetched)
     return response.data.result
@@ -1313,15 +1324,15 @@ export class PlatformVMAPI extends JRPCAPI {
   ): Promise<UnsignedTx> => {
     const to: Buffer[] = this._cleanAddressArray(
       toAddresses,
-      "buildBaseTx"
+      "buildImportTx"
     ).map((a: string): Buffer => bintools.stringToAddress(a))
     const from: Buffer[] = this._cleanAddressArray(
       fromAddresses,
-      "buildBaseTx"
+      "buildImportTx"
     ).map((a: string): Buffer => bintools.stringToAddress(a))
     const change: Buffer[] = this._cleanAddressArray(
       changeAddresses,
-      "buildBaseTx"
+      "buildImportTx"
     ).map((a: string): Buffer => bintools.stringToAddress(a))
 
     let srcChain: string = undefined
@@ -1606,7 +1617,7 @@ export class PlatformVMAPI extends JRPCAPI {
     ).map((a: string): Buffer => bintools.stringToAddress(a))
     const rewards: Buffer[] = this._cleanAddressArray(
       rewardAddresses,
-      "buildAddValidatorTx"
+      "buildAddDelegatorTx"
     ).map((a: string): Buffer => bintools.stringToAddress(a))
 
     if (memo instanceof PayloadBase) {
@@ -1963,7 +1974,8 @@ export class PlatformVMAPI extends JRPCAPI {
       netID in Defaults.network &&
       this.blockchainID in Defaults.network[`${netID}`]
     ) {
-      const { alias } = Defaults.network[`${netID}`][this.blockchainID]
+      const alias: string =
+        Defaults.network[`${netID}`][this.blockchainID]["alias"]
       this.keychain = new KeyChain(this.core.getHRP(), alias)
     } else {
       this.keychain = new KeyChain(this.core.getHRP(), this.blockchainID)

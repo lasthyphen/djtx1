@@ -76,7 +76,7 @@ Method.prototype.setRequestManager = function (requestManager, accounts) {
 
 Method.prototype.createFunction = function (requestManager, accounts) {
     var func = this.buildCall();
-    func.call = this.call;
+    Object.defineProperty(func, 'call', { configurable: true, writable: true, value: this.call });
 
     this.setRequestManager(requestManager || this.requestManager, accounts || this.accounts);
 
@@ -85,7 +85,7 @@ Method.prototype.createFunction = function (requestManager, accounts) {
 
 Method.prototype.attachToObject = function (obj) {
     var func = this.buildCall();
-    func.call = this.call;
+    Object.defineProperty(func, 'call', { configurable: true, writable: true, value: this.call });
     var name = this.name.split('.');
     if (name.length > 1) {
         obj[name[0]] = obj[name[0]] || {};
@@ -164,10 +164,10 @@ Method.prototype.formatOutput = function (result) {
 
     if (Array.isArray(result)) {
         return result.map(function (res) {
-            return _this.outputFormatter && res ? _this.outputFormatter(res) : res;
+            return _this.outputFormatter && res ? _this.outputFormatter(res, this?.hexFormat) : res;
         });
     } else {
-        return this.outputFormatter && result ? this.outputFormatter(result) : result;
+        return this.outputFormatter && result ? this.outputFormatter(result, this?.hexFormat) : result;
     }
 };
 
@@ -181,7 +181,7 @@ Method.prototype.formatOutput = function (result) {
 Method.prototype.toPayload = function (args) {
     var call = this.getCall(args);
     var callback = this.extractCallback(args);
-    
+
     var params = this.formatInput(args);
     this.validateArgs(params);
 
@@ -455,7 +455,7 @@ Method.prototype._confirmTransaction = function (defer, result, payload) {
                                                 to: parsedTx.to,
                                                 from: parsedTx.from,
                                                 gas: parsedTx.gasLimit.toHexString(),
-                                                gasPrice: parsedTx.gasPrice.toHexString(),
+                                                gasPrice: parsedTx.gasPrice ? parsedTx.gasPrice.toHexString() : undefined,
                                                 value: parsedTx.value.toHexString()
                                             });
                                         }
@@ -551,7 +551,7 @@ Method.prototype._confirmTransaction = function (defer, result, payload) {
 
     // start watching for confirmation depending on the support features of the provider
     var startWatching = function (existingReceipt) {
-        let blockHeaderArrived = false; 
+        let blockHeaderArrived = false;
 
         const startInterval = () => {
             intervalId = setInterval(checkConfirmation.bind(null, existingReceipt, true), method.transactionPollingInterval);
@@ -559,12 +559,12 @@ Method.prototype._confirmTransaction = function (defer, result, payload) {
 
         // If provider do not support event subscription use polling
         if(!this.requestManager.provider.on) {
-            return startInterval();            
+            return startInterval();
         }
 
         // Subscribe to new block headers to look for tx receipt
         _ethereumCall.subscribe('newBlockHeaders', function (err, blockHeader, sub) {
-            blockHeaderArrived = true; 
+            blockHeaderArrived = true;
 
             if (err || !blockHeader) {
                 // fall back to polling
@@ -630,9 +630,18 @@ Method.prototype.buildCall = function () {
 
     // actual send function
     var send = function () {
-        var defer = promiEvent(!isSendTx),
-            payload = method.toPayload(Array.prototype.slice.call(arguments));
 
+        let args = Array.prototype.slice.call(arguments);
+
+        var defer = promiEvent(!isSendTx),
+            payload = method.toPayload(args);
+
+        method.hexFormat = false;
+        if (method.call === 'eth_getTransactionReceipt'
+            || method.call === 'eth_getTransactionByHash'
+            || method.name === 'getBlock') {
+            method.hexFormat = (payload.params.length  < args.length && args[args.length - 1] === 'hex')
+        }
         // CALLBACK function
         var sendTxCallback = function (err, result) {
             if (method.handleRevert && isCall && method.abiCoder) {
@@ -644,7 +653,15 @@ Method.prototype.buildCall = function () {
                 if (!err && method.isRevertReasonString(result)){
                     reasonData = result.substring(10);
                 } else if (err && err.data){
-                    reasonData = err.data.substring(10);
+                    // workaround embedded error details got from some providers like MetaMask
+                    if (typeof err.data === 'object') {
+                        // Ganache has no `originalError` sub-object unlike others
+                        var originalError = err.data.originalError ?? err.data;
+                        reasonData = originalError.data.substring(10);
+                    }
+                    else {
+                        reasonData = err.data.substring(10);
+                    }
                 }
 
                 if (reasonData){
@@ -706,7 +723,7 @@ Method.prototype.buildCall = function () {
         // SENDS the SIGNED SIGNATURE
         var sendSignedTx = function (sign) {
 
-            var signedPayload = { ... payload, 
+            var signedPayload = { ... payload,
                 method: 'eth_sendRawTransaction',
                 params: [sign.rawTransaction]
             };
@@ -786,10 +803,20 @@ Method.prototype.buildCall = function () {
             return method.requestManager.send(payload, sendTxCallback);
         };
 
-        // Send the actual transaction
-        if (isSendTx
+        const hasSendTxObject = isSendTx
             && !!payload.params[0]
-            && typeof payload.params[0] === 'object'
+            && typeof payload.params[0] === 'object';
+
+        if (hasSendTxObject &&
+                payload.params[0].type === '0x1'
+                && typeof payload.params[0].accessList === 'undefined'
+            ) {
+                payload.params[0].accessList = [];
+            }
+      
+
+        // Send the actual transaction
+        if (hasSendTxObject
             && (
                 typeof payload.params[0].gasPrice === 'undefined'
                 && (

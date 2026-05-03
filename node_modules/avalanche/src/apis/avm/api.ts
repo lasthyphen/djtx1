@@ -104,7 +104,7 @@ export class AVMAPI extends JRPCAPI {
         this.blockchainID in Defaults.network[`${netid}`]
       ) {
         this.blockchainAlias =
-          Defaults.network[`${netid}`][this.blockchainID].alias
+          Defaults.network[`${netid}`][this.blockchainID]["alias"]
         return this.blockchainAlias
       } else {
         /* istanbul ignore next */
@@ -952,7 +952,7 @@ export class AVMAPI extends JRPCAPI {
    */
   getTx = async (
     txID: string,
-    encoding: string = "cb58"
+    encoding: string = "hex"
   ): Promise<string | object> => {
     const params: GetTxParams = {
       txID,
@@ -1003,7 +1003,8 @@ export class AVMAPI extends JRPCAPI {
     sourceChain: string = undefined,
     limit: number = 0,
     startIndex: { address: string; utxo: string } = undefined,
-    persistOpts: PersistanceOptions = undefined
+    persistOpts: PersistanceOptions = undefined,
+    encoding: string = "hex"
   ): Promise<GetUTXOsResponse> => {
     if (typeof addresses === "string") {
       addresses = [addresses]
@@ -1011,7 +1012,8 @@ export class AVMAPI extends JRPCAPI {
 
     const params: GetUTXOsParams = {
       addresses: addresses,
-      limit
+      limit,
+      encoding
     }
     if (typeof startIndex !== "undefined" && startIndex) {
       params.startIndex = startIndex
@@ -1040,7 +1042,16 @@ export class AVMAPI extends JRPCAPI {
       }
       this.db.set(persistOpts.getName(), data, persistOpts.getOverwrite())
     }
-    utxos.addArray(data, false)
+    if (data.length > 0 && data[0].substring(0, 2) === "0x") {
+      const cb58Strs: string[] = []
+      data.forEach((str: string): void => {
+        cb58Strs.push(bintools.cb58Encode(new Buffer(str.slice(2), "hex")))
+      })
+
+      utxos.addArray(cb58Strs, false)
+    } else {
+      utxos.addArray(data, false)
+    }
     response.data.result.utxos = utxos
     return response.data.result
   }
@@ -1767,9 +1778,9 @@ export class AVMAPI extends JRPCAPI {
     } else if (tx instanceof Buffer) {
       const txobj: Tx = new Tx()
       txobj.fromBuffer(tx)
-      Transaction = txobj.toString()
+      Transaction = txobj.toStringHex()
     } else if (tx instanceof Tx) {
-      Transaction = tx.toString()
+      Transaction = tx.toStringHex()
     } else {
       /* istanbul ignore next */
       throw new TransactionError(
@@ -1777,7 +1788,8 @@ export class AVMAPI extends JRPCAPI {
       )
     }
     const params: IssueTxParams = {
-      tx: Transaction.toString()
+      tx: Transaction.toString(),
+      encoding: "hex"
     }
     const response: RequestResponseData = await this.callMethod(
       "avm.issueTx",
@@ -2079,7 +2091,8 @@ export class AVMAPI extends JRPCAPI {
       netID in Defaults.network &&
       blockchainID in Defaults.network[`${netID}`]
     ) {
-      const { alias } = Defaults.network[`${netID}`][`${blockchainID}`]
+      const alias: string =
+        Defaults.network[`${netID}`][`${blockchainID}`]["alias"]
       this.keychain = new KeyChain(this.core.getHRP(), alias)
     } else {
       this.keychain = new KeyChain(this.core.getHRP(), blockchainID)

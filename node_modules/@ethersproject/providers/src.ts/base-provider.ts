@@ -4,6 +4,7 @@ import {
     Block, BlockTag, BlockWithTransactions, EventType, Filter, FilterByBlockHash, ForkEvent,
     Listener, Log, Provider, TransactionReceipt, TransactionRequest, TransactionResponse
 } from "@ethersproject/abstract-provider";
+import { encode as base64Encode } from "@ethersproject/base64";
 import { Base58 } from "@ethersproject/basex";
 import { BigNumber, BigNumberish } from "@ethersproject/bignumber";
 import { arrayify, BytesLike, concat, hexConcat, hexDataLength, hexDataSlice, hexlify, hexValue, hexZeroPad, isHexString } from "@ethersproject/bytes";
@@ -657,6 +658,16 @@ export class Resolver implements EnsResolver {
             }
         }
 
+        const skynet = hexBytes.match(/^0x90b2c605([0-9a-f]*)$/);
+        if (skynet) {
+            if (skynet[1].length === (34 * 2)) {
+                // URL Safe base64; https://datatracker.ietf.org/doc/html/rfc4648#section-5
+                const urlSafe: Record<string, string> = { "=": "", "+": "-", "/": "_" };
+                const hash = base64Encode("0x" + skynet[1]).replace(/[=+\/]/g, (a) => (urlSafe[a]));
+                return "sia:/\/" + hash;
+            }
+        }
+
         return logger.throwError(`invalid or unsupported content hash data`, Logger.errors.UNSUPPORTED_OPERATION, {
             operation: "getContentHash()",
             data: hexBytes
@@ -738,8 +749,6 @@ export class BaseProvider extends Provider implements EnsProvider {
      */
 
     constructor(network: Networkish | Promise<Network>) {
-        logger.checkNew(new.target, Provider);
-
         super();
 
         // Events being listened to
@@ -1060,7 +1069,13 @@ export class BaseProvider extends Provider implements EnsProvider {
                     if (!event._inflight) {
                         event._inflight = true;
 
-                        // Filter from the last known event; due to load-balancing
+                        // This is the first filter for this event, so we want to
+                        // restrict events to events that happened no earlier than now
+                        if (event._lastBlockNumber === -2) {
+                            event._lastBlockNumber = blockNumber - 1;
+                        }
+
+                        // Filter from the last *known* event; due to load-balancing
                         // and some nodes returning updated block numbers before
                         // indexing events, a logs result with 0 entries cannot be
                         // trusted and we must retry a range which includes it again
@@ -1068,10 +1083,12 @@ export class BaseProvider extends Provider implements EnsProvider {
                         filter.fromBlock = event._lastBlockNumber + 1;
                         filter.toBlock = blockNumber;
 
-                        // Prevent fitler ranges from growing too wild
-                        if (filter.toBlock - this._maxFilterBlockRange > filter.fromBlock) {
-                            filter.fromBlock = filter.toBlock - this._maxFilterBlockRange;
-                        }
+                        // Prevent fitler ranges from growing too wild, since it is quite
+                        // likely there just haven't been any events to move the lastBlockNumber.
+                        const minFromBlock = filter.toBlock - this._maxFilterBlockRange;
+                        if (minFromBlock > filter.fromBlock) { filter.fromBlock = minFromBlock; }
+
+                        if (filter.fromBlock < 0) { filter.fromBlock = 0; }
 
                         const runner = this.getLogs(filter).then((logs) => {
                             // Allow the next getLogs
@@ -1940,7 +1957,7 @@ export class BaseProvider extends Provider implements EnsProvider {
             if (currentName === "" || currentName === ".") { return null; }
 
             // Optimization since the eth node cannot change and does
-            // not have a wildcar resolver
+            // not have a wildcard resolver
             if (name !== "eth" && currentName === "eth") { return null; }
 
             // Check the current node for a resolver
@@ -2005,7 +2022,7 @@ export class BaseProvider extends Provider implements EnsProvider {
             logger.throwArgumentError("invalid ENS name", "name", name);
         }
 
-        // Get the addr from the resovler
+        // Get the addr from the resolver
         const resolver = await this.getResolver(name);
         if (!resolver) { return null; }
 

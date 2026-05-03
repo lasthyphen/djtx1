@@ -93,7 +93,7 @@ function getResult(result) {
     if (result.status == 0 && (result.message === "No records found" || result.message === "No transactions found")) {
         return result.result;
     }
-    if (result.status != 1 || result.message != "OK") {
+    if (result.status != 1 || typeof (result.message) !== "string" || !result.message.match(/^OK/)) {
         var error = new Error("invalid response");
         error.result = JSON.stringify(result);
         if ((result.result || "").toLowerCase().indexOf("rate limit") >= 0) {
@@ -140,7 +140,6 @@ function checkLogTag(blockTag) {
     }
     return parseInt(blockTag.substring(2), 16);
 }
-var defaultApiKey = "9D13ZE7XSBTJ94N9BNJ2MA33VMAY2YPIRB";
 function checkError(method, error, transaction) {
     // Undo the "convenience" some nodes are attempting to prevent backwards
     // incompatibility; maybe for v6 consider forwarding reverts as errors
@@ -212,29 +211,34 @@ function checkError(method, error, transaction) {
 var EtherscanProvider = /** @class */ (function (_super) {
     __extends(EtherscanProvider, _super);
     function EtherscanProvider(network, apiKey) {
-        var _newTarget = this.constructor;
-        var _this = this;
-        logger.checkNew(_newTarget, EtherscanProvider);
-        _this = _super.call(this, network) || this;
+        var _this = _super.call(this, network) || this;
         (0, properties_1.defineReadOnly)(_this, "baseUrl", _this.getBaseUrl());
-        (0, properties_1.defineReadOnly)(_this, "apiKey", apiKey || defaultApiKey);
+        (0, properties_1.defineReadOnly)(_this, "apiKey", apiKey || null);
         return _this;
     }
     EtherscanProvider.prototype.getBaseUrl = function () {
         switch (this.network ? this.network.name : "invalid") {
             case "homestead":
                 return "https:/\/api.etherscan.io";
-            case "ropsten":
-                return "https:/\/api-ropsten.etherscan.io";
-            case "rinkeby":
-                return "https:/\/api-rinkeby.etherscan.io";
-            case "kovan":
-                return "https:/\/api-kovan.etherscan.io";
             case "goerli":
                 return "https:/\/api-goerli.etherscan.io";
+            case "sepolia":
+                return "https:/\/api-sepolia.etherscan.io";
+            case "matic":
+                return "https:/\/api.polygonscan.com";
+            case "maticmum":
+                return "https:/\/api-testnet.polygonscan.com";
+            case "arbitrum":
+                return "https:/\/api.arbiscan.io";
+            case "arbitrum-goerli":
+                return "https:/\/api-goerli.arbiscan.io";
+            case "optimism":
+                return "https:/\/api-optimistic.etherscan.io";
+            case "optimism-goerli":
+                return "https:/\/api-goerli-optimistic.etherscan.io";
             default:
         }
-        return logger.throwArgumentError("unsupported network", "network", name);
+        return logger.throwArgumentError("unsupported network", "network", this.network.name);
     };
     EtherscanProvider.prototype.getUrl = function (module, params) {
         var query = Object.keys(params).reduce(function (accum, key) {
@@ -516,7 +520,7 @@ var EtherscanProvider = /** @class */ (function (_super) {
         });
     };
     EtherscanProvider.prototype.isCommunityResource = function () {
-        return (this.apiKey === defaultApiKey);
+        return (this.apiKey == null);
     };
     return EtherscanProvider;
 }(base_provider_1.BaseProvider));

@@ -5,7 +5,7 @@
     padding: 10px;
     cursor: pointer;
     width: max-content;
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
     border-radius: 15px;
@@ -28,7 +28,7 @@
 @media screen and (max-width: 1010px) {
     .contribute-button {
         position: fixed;
-        display: flex;
+        display: none;
         flex-direction: row-reverse;
         top: auto;
         bottom: 10px;

@@ -56,6 +56,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BaseProvider = exports.Resolver = exports.Event = void 0;
 var abstract_provider_1 = require("@ethersproject/abstract-provider");
+var base64_1 = require("@ethersproject/base64");
 var basex_1 = require("@ethersproject/basex");
 var bignumber_1 = require("@ethersproject/bignumber");
 var bytes_1 = require("@ethersproject/bytes");
@@ -657,7 +658,7 @@ var Resolver = /** @class */ (function () {
     };
     Resolver.prototype.getContentHash = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var hexBytes, ipfs, length_4, ipns, length_5, swarm;
+            var hexBytes, ipfs, length_4, ipns, length_5, swarm, skynet, urlSafe_1, hash;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0: return [4 /*yield*/, this._fetchBytes("0xbc1c58d1")];
@@ -685,6 +686,14 @@ var Resolver = /** @class */ (function () {
                         if (swarm) {
                             if (swarm[1].length === (32 * 2)) {
                                 return [2 /*return*/, "bzz:/\/" + swarm[1]];
+                            }
+                        }
+                        skynet = hexBytes.match(/^0x90b2c605([0-9a-f]*)$/);
+                        if (skynet) {
+                            if (skynet[1].length === (34 * 2)) {
+                                urlSafe_1 = { "=": "", "+": "-", "/": "_" };
+                                hash = (0, base64_1.encode)("0x" + skynet[1]).replace(/[=+\/]/g, function (a) { return (urlSafe_1[a]); });
+                                return [2 /*return*/, "sia:/\/" + hash];
                             }
                         }
                         return [2 /*return*/, logger.throwError("invalid or unsupported content hash data", logger_1.Logger.errors.UNSUPPORTED_OPERATION, {
@@ -738,9 +747,7 @@ var BaseProvider = /** @class */ (function (_super) {
      */
     function BaseProvider(network) {
         var _newTarget = this.constructor;
-        var _this = this;
-        logger.checkNew(_newTarget, abstract_provider_1.Provider);
-        _this = _super.call(this) || this;
+        var _this = _super.call(this) || this;
         // Events being listened to
         _this._events = [];
         _this._emitted = { block: -2 };
@@ -1074,16 +1081,26 @@ var BaseProvider = /** @class */ (function (_super) {
                                     // We only allow a single getLogs to be in-flight at a time
                                     if (!event._inflight) {
                                         event._inflight = true;
-                                        // Filter from the last known event; due to load-balancing
+                                        // This is the first filter for this event, so we want to
+                                        // restrict events to events that happened no earlier than now
+                                        if (event._lastBlockNumber === -2) {
+                                            event._lastBlockNumber = blockNumber - 1;
+                                        }
+                                        // Filter from the last *known* event; due to load-balancing
                                         // and some nodes returning updated block numbers before
                                         // indexing events, a logs result with 0 entries cannot be
                                         // trusted and we must retry a range which includes it again
                                         var filter_1 = event.filter;
                                         filter_1.fromBlock = event._lastBlockNumber + 1;
                                         filter_1.toBlock = blockNumber;
-                                        // Prevent fitler ranges from growing too wild
-                                        if (filter_1.toBlock - _this._maxFilterBlockRange > filter_1.fromBlock) {
-                                            filter_1.fromBlock = filter_1.toBlock - _this._maxFilterBlockRange;
+                                        // Prevent fitler ranges from growing too wild, since it is quite
+                                        // likely there just haven't been any events to move the lastBlockNumber.
+                                        var minFromBlock = filter_1.toBlock - _this._maxFilterBlockRange;
+                                        if (minFromBlock > filter_1.fromBlock) {
+                                            filter_1.fromBlock = minFromBlock;
+                                        }
+                                        if (filter_1.fromBlock < 0) {
+                                            filter_1.fromBlock = 0;
                                         }
                                         var runner = _this.getLogs(filter_1).then(function (logs) {
                                             // Allow the next getLogs
@@ -2251,7 +2268,7 @@ var BaseProvider = /** @class */ (function (_super) {
                             return [2 /*return*/, null];
                         }
                         // Optimization since the eth node cannot change and does
-                        // not have a wildcar resolver
+                        // not have a wildcard resolver
                         if (name !== "eth" && currentName === "eth") {
                             return [2 /*return*/, null];
                         }

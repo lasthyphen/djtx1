@@ -10,7 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 import { Signer } from "@ethersproject/abstract-signer";
 import { BigNumber } from "@ethersproject/bignumber";
-import { hexlify, hexValue, isHexString } from "@ethersproject/bytes";
+import { hexlify, hexValue, hexZeroPad, isHexString } from "@ethersproject/bytes";
 import { _TypedDataEncoder } from "@ethersproject/hash";
 import { checkProperties, deepCopy, defineReadOnly, getStatic, resolveProperties, shallowCopy } from "@ethersproject/properties";
 import { toUtf8Bytes } from "@ethersproject/strings";
@@ -21,18 +21,21 @@ import { version } from "./_version";
 const logger = new Logger(version);
 import { BaseProvider } from "./base-provider";
 const errorGas = ["call", "estimateGas"];
-function spelunk(value) {
+function spelunk(value, requireData) {
     if (value == null) {
         return null;
     }
     // These *are* the droids we're looking for.
-    if (typeof (value.message) === "string" && value.message.match("reverted") && isHexString(value.data)) {
-        return { message: value.message, data: value.data };
+    if (typeof (value.message) === "string" && value.message.match("reverted")) {
+        const data = isHexString(value.data) ? value.data : null;
+        if (!requireData || data) {
+            return { message: value.message, data };
+        }
     }
     // Spelunk further...
     if (typeof (value) === "object") {
         for (const key in value) {
-            const result = spelunk(value[key]);
+            const result = spelunk(value[key], requireData);
             if (result) {
                 return result;
             }
@@ -42,23 +45,38 @@ function spelunk(value) {
     // Might be a JSON string we can further descend...
     if (typeof (value) === "string") {
         try {
-            return spelunk(JSON.parse(value));
+            return spelunk(JSON.parse(value), requireData);
         }
         catch (error) { }
     }
     return null;
 }
 function checkError(method, error, params) {
+    const transaction = params.transaction || params.signedTransaction;
     // Undo the "convenience" some nodes are attempting to prevent backwards
     // incompatibility; maybe for v6 consider forwarding reverts as errors
     if (method === "call") {
-        const result = spelunk(error);
+        const result = spelunk(error, true);
         if (result) {
             return result.data;
         }
+        // Nothing descriptive..
         logger.throwError("missing revert data in call exception; Transaction reverted without a reason string", Logger.errors.CALL_EXCEPTION, {
-            error, data: "0x"
+            data: "0x", transaction, error
         });
+    }
+    if (method === "estimateGas") {
+        // Try to find something, with a preference on SERVER_ERROR body
+        let result = spelunk(error.body, false);
+        if (result == null) {
+            result = spelunk(error, false);
+        }
+        // Found "reverted", this is a CALL_EXCEPTION
+        if (result) {
+            logger.throwError("cannot estimate gas; transaction may fail or may require manual gas limit", Logger.errors.UNPREDICTABLE_GAS_LIMIT, {
+                reason: result.message, method, transaction, error
+            });
+        }
     }
     // @TODO: Should we spelunk for message too?
     let message = error.message;
@@ -72,32 +90,31 @@ function checkError(method, error, params) {
         message = error.responseText;
     }
     message = (message || "").toLowerCase();
-    const transaction = params.transaction || params.signedTransaction;
     // "insufficient funds for gas * price + value + cost(data)"
-    if (message.match(/insufficient funds|base fee exceeds gas limit/)) {
+    if (message.match(/insufficient funds|base fee exceeds gas limit|InsufficientFunds/i)) {
         logger.throwError("insufficient funds for intrinsic transaction cost", Logger.errors.INSUFFICIENT_FUNDS, {
             error, method, transaction
         });
     }
     // "nonce too low"
-    if (message.match(/nonce (is )?too low/)) {
+    if (message.match(/nonce (is )?too low/i)) {
         logger.throwError("nonce has already been used", Logger.errors.NONCE_EXPIRED, {
             error, method, transaction
         });
     }
     // "replacement transaction underpriced"
-    if (message.match(/replacement transaction underpriced/)) {
+    if (message.match(/replacement transaction underpriced|transaction gas price.*too low/i)) {
         logger.throwError("replacement fee too low", Logger.errors.REPLACEMENT_UNDERPRICED, {
             error, method, transaction
         });
     }
     // "replacement transaction underpriced"
-    if (message.match(/only replay-protected/)) {
+    if (message.match(/only replay-protected/i)) {
         logger.throwError("legacy pre-eip-155 transactions not supported", Logger.errors.UNSUPPORTED_OPERATION, {
             error, method, transaction
         });
     }
-    if (errorGas.indexOf(method) >= 0 && message.match(/gas required exceeds allowance|always failing transaction|execution reverted/)) {
+    if (errorGas.indexOf(method) >= 0 && message.match(/gas required exceeds allowance|always failing transaction|execution reverted|revert/)) {
         logger.throwError("cannot estimate gas; transaction may fail or may require manual gas limit", Logger.errors.UNPREDICTABLE_GAS_LIMIT, {
             error, method, transaction
         });
@@ -128,7 +145,6 @@ function getLowerCase(value) {
 const _constructorGuard = {};
 export class JsonRpcSigner extends Signer {
     constructor(constructorGuard, provider, addressOrIndex) {
-        logger.checkNew(new.target, JsonRpcSigner);
         super();
         if (constructorGuard !== _constructorGuard) {
             throw new Error("do not call the JsonRpcSigner constructor directly; use provider.getSigner");
@@ -214,6 +230,12 @@ export class JsonRpcSigner extends Signer {
             return this.provider.send("eth_sendTransaction", [hexTx]).then((hash) => {
                 return hash;
             }, (error) => {
+                if (typeof (error.message) === "string" && error.message.match(/user denied/i)) {
+                    logger.throwError("user rejected transaction", Logger.errors.ACTION_REJECTED, {
+                        action: "sendTransaction",
+                        transaction: tx
+                    });
+                }
                 return checkError("sendTransaction", error, hexTx);
             });
         });
@@ -251,15 +273,39 @@ export class JsonRpcSigner extends Signer {
         return __awaiter(this, void 0, void 0, function* () {
             const data = ((typeof (message) === "string") ? toUtf8Bytes(message) : message);
             const address = yield this.getAddress();
-            return yield this.provider.send("personal_sign", [hexlify(data), address.toLowerCase()]);
+            try {
+                return yield this.provider.send("personal_sign", [hexlify(data), address.toLowerCase()]);
+            }
+            catch (error) {
+                if (typeof (error.message) === "string" && error.message.match(/user denied/i)) {
+                    logger.throwError("user rejected signing", Logger.errors.ACTION_REJECTED, {
+                        action: "signMessage",
+                        from: address,
+                        messageData: message
+                    });
+                }
+                throw error;
+            }
         });
     }
     _legacySignMessage(message) {
         return __awaiter(this, void 0, void 0, function* () {
             const data = ((typeof (message) === "string") ? toUtf8Bytes(message) : message);
             const address = yield this.getAddress();
-            // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_sign
-            return yield this.provider.send("eth_sign", [address.toLowerCase(), hexlify(data)]);
+            try {
+                // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_sign
+                return yield this.provider.send("eth_sign", [address.toLowerCase(), hexlify(data)]);
+            }
+            catch (error) {
+                if (typeof (error.message) === "string" && error.message.match(/user denied/i)) {
+                    logger.throwError("user rejected signing", Logger.errors.ACTION_REJECTED, {
+                        action: "_legacySignMessage",
+                        from: address,
+                        messageData: message
+                    });
+                }
+                throw error;
+            }
         });
     }
     _signTypedData(domain, types, value) {
@@ -269,10 +315,22 @@ export class JsonRpcSigner extends Signer {
                 return this.provider.resolveName(name);
             });
             const address = yield this.getAddress();
-            return yield this.provider.send("eth_signTypedData_v4", [
-                address.toLowerCase(),
-                JSON.stringify(_TypedDataEncoder.getPayload(populated.domain, types, populated.value))
-            ]);
+            try {
+                return yield this.provider.send("eth_signTypedData_v4", [
+                    address.toLowerCase(),
+                    JSON.stringify(_TypedDataEncoder.getPayload(populated.domain, types, populated.value))
+                ]);
+            }
+            catch (error) {
+                if (typeof (error.message) === "string" && error.message.match(/user denied/i)) {
+                    logger.throwError("user rejected signing", Logger.errors.ACTION_REJECTED, {
+                        action: "_signTypedData",
+                        from: address,
+                        messageData: { domain: populated.domain, types, value: populated.value }
+                    });
+                }
+                throw error;
+            }
         });
     }
     unlock(password) {
@@ -308,7 +366,6 @@ const allowedTransactionKeys = {
 };
 export class JsonRpcProvider extends BaseProvider {
     constructor(url, network) {
-        logger.checkNew(new.target, JsonRpcProvider);
         let networkOrReady = network;
         // The network is unknown, query the JSON-RPC for it
         if (networkOrReady == null) {
@@ -455,7 +512,7 @@ export class JsonRpcProvider extends BaseProvider {
             case "getCode":
                 return ["eth_getCode", [getLowerCase(params.address), params.blockTag]];
             case "getStorageAt":
-                return ["eth_getStorageAt", [getLowerCase(params.address), params.position, params.blockTag]];
+                return ["eth_getStorageAt", [getLowerCase(params.address), hexZeroPad(params.position, 32), params.blockTag]];
             case "sendTransaction":
                 return ["eth_sendRawTransaction", [params.signedTransaction]];
             case "getBlock":
@@ -495,7 +552,7 @@ export class JsonRpcProvider extends BaseProvider {
             if (method === "call" || method === "estimateGas") {
                 const tx = params.transaction;
                 if (tx && tx.type != null && BigNumber.from(tx.type).isZero()) {
-                    // If there are no EIP-1559 properties, it might be non-EIP-a559
+                    // If there are no EIP-1559 properties, it might be non-EIP-1559
                     if (tx.maxFeePerGas == null && tx.maxPriorityFeePerGas == null) {
                         const feeData = yield this.getFeeData();
                         if (feeData.maxFeePerGas == null && feeData.maxPriorityFeePerGas == null) {
@@ -597,7 +654,7 @@ export class JsonRpcProvider extends BaseProvider {
             if (transaction[key] == null) {
                 return;
             }
-            const value = hexValue(transaction[key]);
+            const value = hexValue(BigNumber.from(transaction[key]));
             if (key === "gasLimit") {
                 key = "gas";
             }

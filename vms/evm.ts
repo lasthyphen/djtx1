@@ -125,13 +125,13 @@ export default class EVM {
                 if(txHash) {
                     cb({
                         status: 200,
-                        message: `Transaction successful on ${this.NAME} Network!`,
+                        message: `Transaction successful!`,
                         txHash
                     })
                 } else {
                     cb({
                         status: 400,
-                        message: `Transaction failed on ${this.NAME}! Please try again.`
+                        message: `Transaction failed! Please try again.`
                     })
                 }
             } else if(this.hasError.get(receiver) != undefined) {
