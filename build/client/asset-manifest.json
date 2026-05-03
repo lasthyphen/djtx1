@@ -1,13 +1,16 @@
 {
   "files": {
-    "main.css": "/static/css/main.029e9eb9.css",
-    "main.js": "/static/js/main.bc768f61.js",
+    "main.css": "/static/css/main.266bb616.css",
+    "main.js": "/static/js/main.739e5a45.js",
+    "static/media/screen-canvas_4x-png": "/static/media/screen-canvas_4x-8ec5c3faaeee6b8b8a720420fa1a4cd0.bbc92b9bc7faa3767d7d.png",
+    "static/media/macbook-mask_4x-png": "/static/media/macbook-mask_4x-fecf7eaeb867f8c9dca2107b70c0fc5e.216f8385550d91bf91ad.png",
     "index.html": "/index.html",
-    "main.029e9eb9.css.map": "/static/css/main.029e9eb9.css.map",
-    "main.bc768f61.js.map": "/static/js/main.bc768f61.js.map"
+    "static/media/keyboard-mask-svg": "/static/media/keyboard-mask-69935fef8fa165fe7d97675ce064b760.bb185454196eed7d51a6.svg",
+    "main.266bb616.css.map": "/static/css/main.266bb616.css.map",
+    "main.739e5a45.js.map": "/static/js/main.739e5a45.js.map"
   },
   "entrypoints": [
-    "static/css/main.029e9eb9.css",
-    "static/js/main.bc768f61.js"
+    "static/css/main.266bb616.css",
+    "static/js/main.739e5a45.js"
   ]
 }

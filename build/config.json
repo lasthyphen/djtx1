@@ -17,7 +17,7 @@
             "RPC": "https://dijetsnet.uksouth.cloudapp.azure.com:443/ext/bc/U/rpc",
             "CHAINID": 98200,
             "EXPLORER": "https://utility-explorer.swedencentral.cloudapp.azure.com/",
-            "IMAGE": "/chain-djtx.png",
+            "IMAGE": "/djt-chain.svg",
             "MAX_PRIORITY_FEE": "2000000000",
             "MAX_FEE": "100000000000",
             "DRIP_AMOUNT": 1,
