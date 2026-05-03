@@ -1,0 +1,46 @@
+{
+    "GLOBAL_RL": {
+        "ID": "GLOBAL",
+        "RATELIMIT": {
+            "REVERSE_PROXIES": 2,
+            "MAX_LIMIT": 40,
+            "WINDOW_SIZE": 1,
+            "PATH": "/",
+            "SKIP_FAILED_REQUESTS": false
+        }
+    },
+    "evmchains": [
+        {
+            "ID": "DIJETS",
+            "NAME": "Lothar",
+            "TOKEN": "DJT",
+            "RPC": "https://testnet.northeurope.cloudapp.azure.com:443/ext/bc/U/rpc",
+            "CHAINID": 381932,
+            "EXPLORER": "https://lothar-testnet.uksouth.cloudapp.azure.com/",
+            "IMAGE": "/chain-djtx.png",
+            "MAX_PRIORITY_FEE": "2000000000",
+            "MAX_FEE": "100000000000",
+            "DRIP_AMOUNT": 1,
+            "RATELIMIT": {
+                "MAX_LIMIT": 5,
+                "WINDOW_SIZE": 1440
+            }
+        }
+    ],
+    "erc20tokens": [
+        {
+            "ID": "WDJT",
+            "HOSTID": "DIJETS",
+            "NAME": "Wrapped Dijets",
+            "TOKEN": "WDJT",
+            "CONTRACTADDRESS": "0x3Db67c631AAE5c29b3d52504E206c48d5089B551",
+            "DRIP_AMOUNT": 0,
+            "GASLIMIT": "150000",
+            "DECIMALS": 18,
+            "RATELIMIT": {
+                "MAX_LIMIT": 5,
+                "WINDOW_SIZE": 1440
+            }
+        }
+    ]
+}

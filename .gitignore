@@ -3,9 +3,6 @@ node_modules/
 client/node_modules/
 
 # Build output
-build/
-client/build/
-dist/
 
 # Environment variables (contains private keys - never commit)
 .env
