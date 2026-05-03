@@ -15,8 +15,6 @@
         "./**/*.ts"
     ],
     "exclude": [
-        "node_modules",
-        "client",
-        "entity"
+        "node_modules"
     ]
 }
